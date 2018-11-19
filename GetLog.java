@@ -1,11 +1,26 @@
 package root.fishfeeder;
 
+import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.graphics.Color;
+import android.icu.text.DateFormat;
+import android.icu.text.SimpleDateFormat;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.support.annotation.RequiresApi;
+import android.support.v7.widget.CardView;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
+import android.util.TypedValue;
+import android.view.Gravity;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import org.json.JSONException;
@@ -21,23 +36,29 @@ import java.net.MalformedURLException;
 import java.net.ProtocolException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 
-class Request extends AsyncTask<String, Void, String> {
+class GetLog extends AsyncTask<String, Void, String> {
 
-    private String arg;
-    private Context ctx;
     private ProgressDialog p;
+    private Context ctx;
+    private CardView ll;
+    private RecyclerView recyclerView;
 
-    Request(String arg, Context ctx) {
-        this.arg = arg;
-        this.ctx = ctx;
+    GetLog(Context ctx, RecyclerView recyclerView, CardView ll) {
         this.p = new ProgressDialog(ctx);
+        this.ctx = ctx;
+        this.ll = ll;
+        this.recyclerView = recyclerView;
     }
 
     @Override
     protected void onPreExecute() {
         super.onPreExecute();
-        p.setMessage("Sending...");
+        p.setMessage("Loading...");
         p.setIndeterminate(false);
         p.setProgressStyle(ProgressDialog.STYLE_SPINNER);
         p.setCancelable(false);
@@ -49,28 +70,13 @@ class Request extends AsyncTask<String, Void, String> {
     protected String doInBackground(String... params) {
         final StringBuilder response = new StringBuilder();
         try {
-            URL obj = new URL(Setup.PHOTON_URL);
+            URL obj = new URL("http://heyroot.com/photon/log.txt");
             try {
                 HttpURLConnection con = (HttpURLConnection) obj.openConnection();
                 try {
-                    con.setRequestMethod("POST");
+                    con.setRequestMethod("GET");
                 } catch (ProtocolException e) {
                     e.printStackTrace();
-                }
-                String urlParameters = "arg=" + arg;
-                byte[] postData = new byte[0];
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
-                    postData = urlParameters.getBytes(StandardCharsets.UTF_8);
-                }
-                int postDataLength = postData.length;
-                con.setDoOutput(true);
-                con.setInstanceFollowRedirects(false);
-                con.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-                con.setRequestProperty("charset", "utf-8");
-                con.setRequestProperty("Content-Length", Integer.toString(postDataLength));
-                con.setUseCaches(false);
-                try (DataOutputStream wr = new DataOutputStream(con.getOutputStream())) {
-                    wr.write(postData);
                 }
                 BufferedReader in;
                 try {
@@ -100,18 +106,29 @@ class Request extends AsyncTask<String, Void, String> {
     @Override
     protected void onPostExecute(String result) {
         super.onPostExecute(result);
-        JSONTokener token = new JSONTokener(result);
-        JSONObject obj = null;
-        try {
-            obj = new JSONObject(token);
-        } catch (JSONException e) {
-            e.printStackTrace();
+        p.dismiss();
+        String[] objects = result.split("---");
+        List<FeedLog> productList = new ArrayList<>();
+        for (int i = objects.length; i >= 0; i--) {            try {
+                JSONTokener token = new JSONTokener(objects[i]);
+                JSONObject obj = new JSONObject(token);
+                String publishedAt = obj.getString("published_at");
+                String data = obj.getString("data");
+                SimpleDateFormat parser = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
+                Date date = parser.parse(publishedAt);
+                SimpleDateFormat formatter = new SimpleDateFormat("MM-dd-yyyy HH:mm");
+                String time = formatter.format(date);
+                recyclerView.setHasFixedSize(true);
+                recyclerView.setLayoutManager(new LinearLayoutManager(ctx));
+                productList.add(
+                        new FeedLog(
+                                1, data, time
+                                ));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
-        if (obj != null) {
-            p.dismiss();
-        } else {
-            p.setMessage("WiFi is a luxury, which the photon doesn\'t have right now. Try again later :( It will feed at the last time you set, and if no time was set it will feed at 2:00 A.M.");
-        }
-        p.setCancelable(true);
+        LogAdapter adapter = new LogAdapter(ctx, productList, ll);
+        recyclerView.setAdapter(adapter);
     }
 }

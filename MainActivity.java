@@ -1,12 +1,13 @@
 package root.fishfeeder;
 
+import android.content.Intent;
+import android.icu.text.DateFormat;
+import android.icu.text.SimpleDateFormat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
-import com.crashlytics.android.Crashlytics;
-import io.fabric.sdk.android.Fabric;
 
 public class MainActivity extends AppCompatActivity {
     EditText feedTime;
@@ -16,7 +17,6 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Fabric.with(this, new Crashlytics());
         setContentView(R.layout.activity_main);
 
         utils = new Utils(this);
@@ -26,7 +26,6 @@ public class MainActivity extends AppCompatActivity {
 
         dailyFeedTime.setEnabled(false);
         feedNow.setEnabled(false);
-
         utils.ButtonStatus(feedTime, dailyFeedTime, feedNow);
     }
 
@@ -34,16 +33,16 @@ public class MainActivity extends AppCompatActivity {
         utils.CalenderDialog(feedTime);
     }
 
+    public void log(View v) {
+        startActivity(new Intent(this, LogActivity.class));
+    }
+
     public void feedNow(View v) {
         String time = feedTime.getText().toString();
         utils.Send("feed=" + time);
     }
 
-    public void checkFeedTime(View v) {
-        utils.CheckFeedTime();
-    }
-
     public void info(View v) {
-
+        utils.Dialog("About", "Created by Robotic's students Julian Osborne, Michael Ortiz, and Matt Adiletto with help from our dope teachers Mr. Christy and Mr. Alveraz.");
     }
 }

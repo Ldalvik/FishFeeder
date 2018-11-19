@@ -28,13 +28,20 @@
 
     </LinearLayout>
 
-        <Button
-            android:id="@+id/daily_feed_time"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_margin="10dp"
-            android:onClick="dailyFeedTime"
-            android:text="@string/daily_feed_time" />
+    <Button
+        android:id="@+id/daily_feed_time"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="10dp"
+        android:onClick="dailyFeedTime"
+        android:text="@string/daily_feed_time" />
+
+    <Button
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="10dp"
+        android:onClick="log"
+        android:text="log" />
 
     <Button
         android:id="@+id/feed_now"
@@ -43,14 +50,6 @@
         android:layout_margin="10dp"
         android:onClick="feedNow"
         android:text="@string/feed_now" />
-
-    <Button
-        android:id="@+id/check_feed_time"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_margin="10dp"
-        android:onClick="checkFeedTime"
-        android:text="@string/check_feed_time" />
 
     <Button
         android:id="@+id/info"

@@ -3,11 +3,18 @@ package root.fishfeeder;
 import android.app.AlertDialog;
 import android.app.TimePickerDialog;
 import android.content.Context;
+import android.support.v7.widget.CardView;
+import android.support.v7.widget.RecyclerView;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
 import android.widget.TimePicker;
+import android.widget.Toast;
 
 import java.util.Calendar;
 
@@ -20,22 +27,20 @@ class Utils {
     }
 
     void Send(String arg) {
-        Request r = new Request(arg);
+        Request r = new Request(arg, ctx);
+        r.execute();
+    }
+    void Log(RecyclerView rv, CardView ll) {
+        GetLog r = new GetLog(ctx, rv, ll);
         r.execute();
     }
 
-    void CheckFeedTime() {
-        Get r = new Get(ctx);
-        r.execute();
-    }
-
-    void Dialog(String message) {
+    void Dialog(String title, String message) {
 
         AlertDialog.Builder dialog = new AlertDialog.Builder(ctx);
         dialog.setInverseBackgroundForced(true);
-        dialog.setTitle("Daily feed time");
+        dialog.setTitle(title);
         dialog.setMessage(message);
-        dialog.setNegativeButton("Cancel", null);
         dialog.setPositiveButton("OK", null);
         dialog.show();
     }
@@ -68,6 +73,7 @@ class Utils {
                     @Override
                     public void onTimeSet(TimePicker view, int hourOfDay, int minute) {
                         Send("daily=" + time + "," + hourOfDay + "," + minute);
+                        Toast.makeText(ctx, time + " seconds @" + hourOfDay + ":" + minute, Toast.LENGTH_SHORT).show();;
                     }
                 }, hour, minute, false);
         timePickerDialog.show();
