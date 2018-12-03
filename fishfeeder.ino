@@ -1,164 +1,136 @@
 #include <Particle.h>
 
-SYSTEM_MODE(SEMI_AUTOMATIC);
+SYSTEM_MODE(AUTOMATIC);
 
-#define motor1 D6
-#define motor2 D5
-#define encoder D1
-#define encoder2 D2
-#define OFF 0
-#define ON 1
-#define STUCK 2
+#define motor1 D1
+#define motor2 D0
+#define encoder D2
+
+#define FEED 0
+#define WAIT 1
+#define ERROR 2
 #define CHECK 3
-#define FORWARD 4
-#define REVERSE 5
-#define MOTOR_OFF 6
-volatile unsigned int count = 0;
-volatile unsigned int direction;
-Timer t(1000, print);
 
-int hour;
-int minute;
+#define FORWARD 0
+#define REVERSE 1
+#define OFF 2
+
+int state = WAIT;
+
+volatile unsigned int currentRotation = 0;
+
+int feedHour;
+int feedMinute;
 int rotations;
-long now;
-long last;
-int state = CHECK;
-int stuck_timer;
-uint8_t retry_count = 0;
-unsigned long old_time = millis();
+int currentHour;
+int currentMinute;
+int currentSecond;
+
+Timer t(60000, status);
 
 void setup() {
   pinMode(motor1, OUTPUT);
   pinMode(motor2, OUTPUT);
   pinMode(encoder, INPUT_PULLUP);
-  pinMode(encoder2, INPUT_PULLUP);
   attachInterrupt(encoder, pulse, RISING);
+  //t.start();
   Time.zone(-5);
-  rotations = 5;
-  t.start();
-  hour = 14;
-  minute = 00;
-  WiFi.on();
+  feedHour = 9;
+  feedMinute = 10;
+  rotations = 500;
+  print("Start", "Flashed @ " + String(Time.hour()) + ":" + String(Time.minute()));
 }
 
 void loop() {
+  currentHour = Time.hour();
+  currentMinute = Time.minute();
+  currentSecond = Time.second();
   Particle.function("fish_feeder", feeder);
 
-  int currentHour = Time.hour();
-  int currentMinute = Time.minute();
-  int ping = Time.second();
-
-  if (millis() - old_time >= 2000) {
-    if (retry_count < 10) {
-      if (!WiFi.ready()) {
-        WiFi.connect();
-        retry_count++;
-      } else if (!Particle.connected()) {
-        Particle.connect();
-        retry_count++;
-      }
-    } else {
-      retry_count = 0;
-    }
-    old_time = millis();
-  }
-
   switch (state) {
-    case CHECK:
-      if ((currentHour == hour) && (currentMinute == minute)) {
-          feed(FORWARD, rotations);
-          //drive(f)
-          //state = FEEDING
-          Particle.publish("log", "Daily feed @" + String(hour) + ":" + String(minute) + " for " + String(rotations) + " rotations.");
+    case FEED:
+      if (currentRotation > 1000) {
+        state = ERROR;
       }
-      break;
-    //case FEEDING
-        //if (count > rotations)
-        //state = OFF
-    case OFF:
-      count = 0;
-      if (currentMinute != minute) {
+      if (currentRotation < rotations) {
+        motor(FORWARD);
+      }
+      if (currentRotation >= rotations) {
         state = CHECK;
       }
       break;
-    case ON:
-      minute = currentMinute;
-      feed(FORWARD, rotations);
+    case WAIT:
+        currentRotation = 0;
+        motor(OFF);
+      if ((currentHour == feedHour) && (currentMinute == feedMinute)) {
+        print("log", "Starting feed.");
+        state = FEED;
+      }
       break;
-    case STUCK:
-      Particle.publish("stuck", "", PRIVATE);
-      Particle.publish("log", "In reverse for 5 seconds (Feeder got stuck!)");
-      feed(REVERSE, 600 * 5);
+    case CHECK:
+        if(currentMinute != feedMinute){
+            state = WAIT;
+      }
       break;
-  }
-
-  if (ping == 00) {
-    Particle.publish("ping", "le ping per minute");
-    delay(1000);
+    case ERROR:
+      print("log", "Rotation exceeded 1000, stopping feed.");
+      state = WAIT;
+      break;
   }
 }
 
 int feeder(String command) {
-  if (strstr(command, "feed=")) {
-    int equal = command.indexOf("=") + 1;
-    int seconds = command.remove(0, equal).toInt();
-    rotations = seconds;
-    Particle.publish("log", "Fed for " + String(seconds) + " rotations.");
-    state = ON;
-    return 1;
-  }
   if (strstr(command, "daily=")) {
     int equal = command.indexOf("=") + 1;
     String vars = command.remove(0, equal);
     rotations = getValue(vars, ',', 0).toInt();
-    hour = getValue(vars, ',', 1).toInt();
-    minute = getValue(vars, ',', 2).toInt();
-    Particle.publish("log", "Feeding daily at " + String(hour) + ":" + String(minute) + " for " + String(rotations) + " rotations.");
-    return 2;
-  }
-  if (strstr(command, "reverse=")) {
-    int equal = command.indexOf("=") + 1;
-    int seconds = command.remove(0, equal).toInt();
-    feed(REVERSE, seconds);
+    feedHour = getValue(vars, ',', 1).toInt();
+    feedMinute = getValue(vars, ',', 2).toInt();
+    nextFeed();
     return 1;
   }
 }
 
-void feed(int motor, int rotations) {
-  if (motor == FORWARD) {
-    digitalWrite(motor1, HIGH);
-    digitalWrite(motor2, LOW);
-    while (count < rotations);
-    digitalWrite(motor1, LOW);
-    digitalWrite(motor2, LOW);
-    state = OFF;
-  }
+void pulse() {
+  currentRotation++;
 }
 
-void print(){
-    Particle.publish("count", String(count));
+void motor(int mode) {
+    if(mode == FORWARD){
+        digitalWrite(motor1, LOW);
+        digitalWrite(motor2, HIGH);
+    }
+    if(mode == REVERSE){
+        digitalWrite(motor1, HIGH);
+        digitalWrite(motor2, LOW);
+    }
+    if(mode == OFF){
+        digitalWrite(motor1, LOW);
+        digitalWrite(motor2, LOW);
+    }
 }
 
-void pulse()
-{
-  count++;
-  if (digitalRead(encoder2) == LOW) {
-    direction = 1;
-  } else {
-    direction = 2;
-  }
+void print(String title, String description) {
+  Particle.publish(title, description);
 }
 
-void print_every_second()
-{
-  Particle.publish("Count", String(stuck_timer));
+void status() {
+  print("{currentRotations}", String(currentRotation));
+  print("{hour}", String(feedHour));
+  print("{minute}", String(feedMinute));
+  print("{rotations}", String(rotations));
+}
+
+void nextFeed() {
+  int hours = feedHour - currentHour;
+  int minutes = feedMinute - currentMinute;
+  print("log", "Feeding in " + String(hours) + " hours and " + String(minutes) + " minutes for " + String(rotations) + " rotations.");
 }
 
 String getValue(String data, char separator, int index) {
   int found = 0;
   int strIndex[] = {0, -1};
   int maxIndex = data.length() - 1;
-
   for (int i = 0; i <= maxIndex && found <= index; i++) {
     if (data.charAt(i) == separator || i == maxIndex) {
       found++;
@@ -166,6 +138,5 @@ String getValue(String data, char separator, int index) {
       strIndex[1] = (i == maxIndex) ? i + 1 : i;
     }
   }
-
   return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
